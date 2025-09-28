@@ -1,61 +1,105 @@
+import streamlit as st
 import json
 from datetime import datetime
 from calculator import calculate_pulls, is_goal_reached
 from parameters import daily_income, weekly_income, monthly_income, gems_per_pull, banner_tickets
 
-# Load JSON data
+# config
+st.set_page_config(page_title="Haikyuu Pull Planner", page_icon="🏐", layout="centered")
+
+# css
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #fdf6f0; /* light background */
+        color: #222;
+    }
+    .result-box {
+        background-color: #ffffff;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0px 0px 5px rgba(0,0,0,0.1);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# explanation
+with st.expander("ℹ️ See how calculations are done"):
+    st.markdown(
+        """
+        **Calculator Parameters**
+        
+        - **UR ticket = 150 gems**
+        - **Daily income = 200 gems**  
+          (60 daily missions + 85 training + 30 free time + 15 summit challenge + 10 PVP)
+        - **Weekly income = 800 gems**  
+          (100 weekly missions + 150 chill games + 50 club + 120 weekend bonus + 380 specialty test)
+        - **Monthly income = 1830 gems**  
+          (350 PvP ranking + 2×640 match streak + 150 update compensation + 50 calendar)
+        - **Banner tickets = 15 per banner**  
+          (login bonuses + event shop)
+        """
+    )
+
+# Load banners
 with open("DATA/incoming_banner.json", "r") as f:
     banners = json.load(f)
 
-print("=== Upcoming Banners ===")
-today = datetime.today().date()
+st.title("🏐 Haikyuu Pull Planner")
+st.markdown("Plan your pulls and check if you will reach pity before the banner ends!")
 
-# Get only future banners
+today = datetime.today().date()
 upcoming_banners = [
     (b["character"], datetime.fromisoformat(b["start_date"]).date(), datetime.fromisoformat(b["end_date"]).date(), b["is_rerun"])
     for b in banners
     if datetime.fromisoformat(b["end_date"]).date() >= today
 ]
 
-# Display future banners
-for i, (char, start, end, rerun) in enumerate(upcoming_banners, 1):
-    r_flag = " (Rerun)" if rerun else ""
-    print(f"{i}. {char}{r_flag} — {start} → {end}")
+# Banner selector
+banner_options = [f"{char}{' (Rerun)' if rerun else ''} — {start} → {end}" for char, start, end, rerun in upcoming_banners]
+choice = st.selectbox("Select the banner you are aiming for:", banner_options)
 
-choice = int(input("\nSelect the number of the banner you are aiming for: "))
-target_char, start_date, end_date, _ = upcoming_banners[choice - 1]
+selected_index = banner_options.index(choice)
+target_char, start_date, end_date, _ = upcoming_banners[selected_index]
 days_until_banner = (end_date - today).days
-
-# COUNT banners from now to target banner (inclusive)
-banner_count = choice  # because our list is sorted and 1-indexed
+banner_count = selected_index + 1
 total_banner_tickets = banner_count * banner_tickets
 
-print(f"\n🎯 Selected Banner: {target_char} (ends on {end_date}, in {days_until_banner} days)")
-print(f"⚙️  Current Config: {daily_income}/day | {weekly_income}/week | {monthly_income}/month | {banner_tickets} tickets per banner | {gems_per_pull} gems/pull")
-print(f"   (Banners until target: {banner_count}, so total banner tickets = {total_banner_tickets})\n")
+st.write(f"🎯 **Selected Banner:** {target_char}")
+st.write(f"⏳ Ends on **{end_date}** — in **{days_until_banner} days**")
+st.write(f"🎟️ Total banner tickets expected: **{total_banner_tickets}**")
 
 # User inputs
-current_gems = int(input("💎 Current gems: "))
-current_tickets = int(input("🎟️ Current UR tickets: "))
-pity_remaining = int(input("📊 Pity remaining (how many pulls left for guarantee): "))
+current_gems = st.number_input("💎 Current gems:", min_value=0, step=10)
+current_tickets = st.number_input("🎟️ Current UR tickets:", min_value=0, step=1)
+pity_remaining = st.number_input("📊 Pity remaining (pulls needed for guarantee):", min_value=0, max_value=140, step=1)
 
-# Pass total banner tickets to the calculator
-result = calculate_pulls(current_gems, current_tickets, pity_remaining, days_until_banner)
-result["pulls_from_banner"] = total_banner_tickets
-result["total_pulls"] = result["pulls_from_gems"] + result["pulls_from_tickets"] + result["pulls_from_banner"]
+if st.button("Calculate"):
+    result = calculate_pulls(current_gems, current_tickets, pity_remaining, days_until_banner)
+    result["pulls_from_banner"] = total_banner_tickets
+    result["total_pulls"] = result["pulls_from_gems"] + result["pulls_from_tickets"] + result["pulls_from_banner"]
 
-goal_reached, remaining_pulls = is_goal_reached(result["total_pulls"], result["pity_needed"])
+    goal_reached, remaining_pulls = is_goal_reached(result["total_pulls"], result["pity_needed"])
 
-# Display results
-print(f"\n📊 Results:")
-print(f"   ➤ Total predicted gems: {result['total_gems']}")
-print(f"   ➤ Pulls from gems: {result['pulls_from_gems']}")
-print(f"   ➤ Current UR tickets: {result['pulls_from_tickets']}")
-print(f"   ➤ Banner tickets (all banners): {result['pulls_from_banner']}")
-print(f"   ➤ Total available pulls: {result['total_pulls']}")
-print(f"   ➤ Pulls needed for pity: {result['pity_needed']}")
+    st.markdown("### 📊 Results")
+    st.markdown(
+        f"""
+        <div class="result-box">
+        <b>Total predicted gems:</b> {result['total_gems']}<br>
+        <b>Pulls from gems:</b> {result['pulls_from_gems']}<br>
+        <b>Current UR tickets:</b> {result['pulls_from_tickets']}<br>
+        <b>Banner tickets:</b> {result['pulls_from_banner']}<br>
+        <b>Total available pulls:</b> {result['total_pulls']}<br>
+        <b>Pulls needed for pity:</b> {result['pity_needed']}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-if goal_reached:
-    print(f"✅ Goal reached! Surplus: {abs(remaining_pulls)} pulls")
-else:
-    print(f"❌ Not enough... you still need {abs(remaining_pulls)} pulls")
+    if goal_reached:
+        st.success(f"✅ Goal reached! Surplus: {abs(remaining_pulls)} pulls")
+    else:
+        st.error(f"❌ Not enough... you still need {abs(remaining_pulls)} pulls")
