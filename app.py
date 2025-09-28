@@ -103,3 +103,22 @@ if st.button("Calculate"):
         st.success(f"✅ Goal reached! Surplus: {abs(remaining_pulls)} pulls")
     else:
         st.error(f"❌ Not enough... you still need {abs(remaining_pulls)} pulls")
+
+# Bas de page
+
+st.markdown(
+    """
+    <div style="
+        margin-top: 2rem;
+        padding: 0.8rem;
+        background-color: #f1f1f1;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 0.9rem;
+    ">
+        Made by <b>Pierre Graef</b> — Data Engineer<br>
+        🌐 <a href="https://www.pierregraef.com" target="_blank" style="text-decoration:none; color:#FF6600;">pierregraef.com</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
